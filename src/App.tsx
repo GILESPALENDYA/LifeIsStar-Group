@@ -14,6 +14,7 @@ import AdminDashboard from './pages/Admin/Dashboard';
 import AdminProducts from './pages/Admin/Products';
 import AdminProfile from './pages/Admin/ProfileSettings';
 import AdminTestimonials from './pages/Admin/Testimonials';
+import About from './pages/About';
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <main className="flex-grow pt-16">
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/about" element={<About />} />
             <Route path="/product/:id" element={<ProductDetail />} />
             <Route path="/admin" element={<AdminLogin />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />

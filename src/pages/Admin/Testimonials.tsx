@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -25,14 +25,41 @@ import {
   orderBy,
   serverTimestamp 
 } from 'firebase/firestore';
-import React, { useRef } from 'react';
+import { Testimonial } from '../../types';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import toast from 'react-hot-toast';
 
 export default function AdminTestimonials() {
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [imageTab, setImageTab] = useState<'url' | 'upload'>('upload');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Dialog States
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+    isLoading?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+    onConfirm: () => {},
+  });
+
+  const [successConfig, setSuccessConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+  });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -65,23 +92,43 @@ export default function AdminTestimonials() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleApplySubmit = async () => {
     try {
+      setConfirmConfig(prev => ({ ...prev, isLoading: true }));
       await addDoc(collection(db, 'testimonials'), {
         ...formData,
         createdAt: serverTimestamp()
       });
-      toast.success('Testimoni ditambahkan');
+      
+      setConfirmConfig(prev => ({ ...prev, isOpen: false, isLoading: false }));
       setIsModalOpen(false);
       setFormData({ name: '', role: '', content: '', rating: 5, avatarUrl: '' });
+      
+      setSuccessConfig({
+        isOpen: true,
+        title: 'Berhasil Ditambahkan',
+        message: 'Testimoni pelanggan telah berhasil disimpan.'
+      });
+      
       fetchData();
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'testimonials');
+      setConfirmConfig(prev => ({ ...prev, isOpen: false, isLoading: false }));
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Simpan Testimoni?',
+      message: 'Apakah Anda ingin menyimpan testimoni dari pelanggan ini?',
+      type: 'info',
+      onConfirm: handleApplySubmit
+    });
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -96,15 +143,31 @@ export default function AdminTestimonials() {
     };
     reader.readAsDataURL(file);
   };
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Hapus testimoni ini?')) return;
-    try {
-      await deleteDoc(doc(db, 'testimonials', id));
-      toast.success('Testimoni dihapus');
-      fetchData();
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `testimonials/${id}`);
-    }
+  const handleDelete = (id: string) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Hapus Testimoni?',
+      message: 'Apakah Anda yakin ingin menghapus testimoni ini?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          setConfirmConfig(prev => ({ ...prev, isLoading: true }));
+          await deleteDoc(doc(db, 'testimonials', id));
+          setConfirmConfig(prev => ({ ...prev, isOpen: false, isLoading: false }));
+          
+          setSuccessConfig({
+            isOpen: true,
+            title: 'Berhasil Dihapus',
+            message: 'Testimoni telah dihapus dari sistem.'
+          });
+          
+          fetchData();
+        } catch (error) {
+          handleFirestoreError(error, OperationType.DELETE, `testimonials/${id}`);
+          setConfirmConfig(prev => ({ ...prev, isOpen: false, isLoading: false }));
+        }
+      }
+    });
   };
 
   return (
@@ -217,7 +280,7 @@ export default function AdminTestimonials() {
                   <input
                     required
                     type="text"
-                    value={formData.name}
+                    value={formData.name || ''}
                     onChange={e => setFormData({ ...formData, name: e.target.value })}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-accent outline-none transition-all"
                     placeholder="Contoh: Budi Santoso"
@@ -228,7 +291,7 @@ export default function AdminTestimonials() {
                   <label className="block text-sm font-medium text-gray-400 mb-1">Pekerjaan / Role (Optional)</label>
                   <input
                     type="text"
-                    value={formData.role}
+                    value={formData.role || ''}
                     onChange={e => setFormData({ ...formData, role: e.target.value })}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-accent outline-none transition-all"
                     placeholder="Contoh: Photographer"
@@ -236,39 +299,51 @@ export default function AdminTestimonials() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Avatar Customer</label>
-                  <div className="flex bg-white/5 p-1 rounded-xl mb-3">
-                    <button 
-                      type="button" 
-                      onClick={() => setImageTab('upload')}
-                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${imageTab === 'upload' ? "bg-brand-accent text-white" : "text-gray-500 hover:text-white"}`}
-                    >
-                      <Upload className="w-3 h-3" /> UPLOAD
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={() => setImageTab('url')}
-                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${imageTab === 'url' ? "bg-brand-accent text-white" : "text-gray-500 hover:text-white"}`}
-                    >
-                      <LinkIcon className="w-3 h-3" /> URL
-                    </button>
-                  </div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Avatar Customer (Optional)</label>
+                  
+                  <div className="space-y-4">
+                    {/* URL Field */}
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <LinkIcon className="h-4 w-4 text-gray-500" />
+                      </div>
+                      <input
+                        type="text"
+                        value={(formData.avatarUrl && !formData.avatarUrl.startsWith('data:')) ? formData.avatarUrl : ''}
+                        onChange={e => setFormData({ ...formData, avatarUrl: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white focus:border-brand-accent outline-none transition-all text-sm"
+                        placeholder="Tempel URL avatar di sini (https://...)"
+                      />
+                    </div>
 
-                  {imageTab === 'upload' ? (
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 p-4 bg-white/5 border border-white/10 rounded-xl">
                       <div 
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-16 h-16 rounded-full bg-white/5 border border-dashed border-white/20 flex flex-col items-center justify-center cursor-pointer hover:border-brand-accent/50 transition-all overflow-hidden shrink-0"
+                        className="w-16 h-16 rounded-full bg-white/5 border border-dashed border-white/20 flex flex-col items-center justify-center cursor-pointer hover:border-brand-accent/50 transition-all overflow-hidden shrink-0 relative group"
                       >
-                        {formData.avatarUrl && formData.avatarUrl.startsWith('data:') ? (
-                          <img src={formData.avatarUrl} alt="Preview" className="w-full h-full object-cover" />
+                        {formData.avatarUrl ? (
+                          <>
+                            <img src={formData.avatarUrl} alt="Preview" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <Upload className="w-4 h-4 text-white" />
+                            </div>
+                          </>
                         ) : (
                           <Upload className="w-4 h-4 text-gray-600" />
                         )}
                       </div>
                       <div className="flex-1">
-                        <p className="text-[10px] text-gray-500">Klik lingkaran untuk upload avatar</p>
-                        <p className="text-[10px] text-gray-700 mt-0.5">Maks 5MB</p>
+                        <p className="text-sm font-medium text-gray-300">Upload Lokal</p>
+                        <p className="text-[10px] text-gray-500">Klik lingkaran untuk upload file (Maks 5MB)</p>
+                        {formData.avatarUrl && (
+                          <button 
+                            type="button" 
+                            onClick={() => setFormData({...formData, avatarUrl: ''})}
+                            className="text-[10px] uppercase font-bold text-red-400 mt-1 hover:underline"
+                          >
+                            Hapus Avatar
+                          </button>
+                        )}
                       </div>
                       <input 
                         type="file" 
@@ -278,21 +353,13 @@ export default function AdminTestimonials() {
                         className="hidden" 
                       />
                     </div>
-                  ) : (
-                    <input
-                      type="text"
-                      value={formData.avatarUrl.startsWith('data:') ? '' : formData.avatarUrl}
-                      onChange={e => setFormData({ ...formData, avatarUrl: e.target.value })}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-accent outline-none transition-all"
-                      placeholder="https://..."
-                    />
-                  )}
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1">Rating</label>
                   <select
-                    value={formData.rating}
+                    value={formData.rating || 5}
                     onChange={e => setFormData({ ...formData, rating: Number(e.target.value) })}
                     className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-accent outline-none transition-all"
                   >
@@ -307,7 +374,7 @@ export default function AdminTestimonials() {
                   <textarea
                     required
                     rows={4}
-                    value={formData.content}
+                    value={formData.content || ''}
                     onChange={e => setFormData({ ...formData, content: e.target.value })}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-accent outline-none transition-all resize-none"
                     placeholder="Tulis testimoni customer di sini..."
@@ -325,6 +392,26 @@ export default function AdminTestimonials() {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+        isLoading={confirmConfig.isLoading}
+      />
+
+      <ConfirmDialog
+        isOpen={successConfig.isOpen}
+        onClose={() => setSuccessConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={() => setSuccessConfig(prev => ({ ...prev, isOpen: false }))}
+        title={successConfig.title}
+        message={successConfig.message}
+        type="success"
+        confirmLabel="Siap!"
+      />
     </div>
   );
 }

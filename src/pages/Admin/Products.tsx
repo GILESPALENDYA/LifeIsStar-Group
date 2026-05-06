@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, FormEvent, ChangeEvent } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -31,8 +31,8 @@ import {
 } from 'firebase/firestore';
 import { Product, Category, MarketplaceLinks } from '../../types';
 import { formatCurrency, cn } from '../../lib/utils';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import toast from 'react-hot-toast';
-import React, { useRef } from 'react';
 
 const FIXED_CATEGORIES = ['Android', 'Iphone', 'MacBook', 'Tablet', 'Ipad'];
 
@@ -42,9 +42,38 @@ export default function AdminProducts() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [editingLinks, setEditingLinks] = useState<MarketplaceLinks>({});
-  const [imageTab, setImageTab] = useState<'url' | 'upload'>('upload');
+  const [editingLinks, setEditingLinks] = useState<MarketplaceLinks>({
+    tokopedia: '',
+    shopee: '',
+    blibli: ''
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Dialog States
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'danger' | 'warning' | 'info' | 'success';
+    onConfirm: () => void;
+    isLoading?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+    onConfirm: () => {},
+  });
+
+  const [successConfig, setSuccessConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+  });
   
   const navigate = useNavigate();
 
@@ -52,7 +81,7 @@ export default function AdminProducts() {
   const [formData, setFormData] = useState({
     name: '',
     categoryId: '',
-    price: 0,
+    price: 0 as number | string,
     description: '',
     imageUrl: '',
     status: 'active' as 'active' | 'hidden'
@@ -93,27 +122,35 @@ export default function AdminProducts() {
   const handleEdit = async (product: Product) => {
     setEditingProduct(product);
     setFormData({
-      name: product.name,
-      categoryId: product.categoryId,
-      price: product.price,
-      description: product.description,
-      imageUrl: product.imageUrl,
-      status: product.status
+      name: product.name || '',
+      categoryId: product.categoryId || '',
+      price: product.price ?? 0,
+      description: product.description || '',
+      imageUrl: product.imageUrl || '',
+      status: product.status || 'active'
     });
 
     // Fetch links
     const lSnap = await getDoc(doc(db, 'products', product.id, 'links', 'main'));
     if (lSnap.exists()) {
-      setEditingLinks(lSnap.data() as MarketplaceLinks);
+      const data = lSnap.data();
+      setEditingLinks({
+        tokopedia: data.tokopedia || '',
+        shopee: data.shopee || '',
+        blibli: data.blibli || ''
+      });
     } else {
-      setEditingLinks({});
+      setEditingLinks({
+        tokopedia: '',
+        shopee: '',
+        blibli: ''
+      });
     }
     
-    setImageTab(product.imageUrl.startsWith('data:') ? 'upload' : 'url');
     setModalOpen(true);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -139,26 +176,44 @@ export default function AdminProducts() {
       imageUrl: '',
       status: 'active'
     });
-    setEditingLinks({});
-    setImageTab('upload');
+    setEditingLinks({
+      tokopedia: '',
+      shopee: '',
+      blibli: ''
+    });
     setModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Yakin ingin menghapus produk ini?')) return;
-    try {
-      await deleteDoc(doc(db, 'products', id));
-      toast.success('Produk dihapus');
-      fetchData();
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `products/${id}`);
-    }
+  const handleDelete = (id: string) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Hapus Produk?',
+      message: 'Apakah Anda yakin ingin menghapus produk ini? Data yang dihapus tidak dapat dikembalikan.',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          setConfirmConfig(prev => ({ ...prev, isLoading: true }));
+          await deleteDoc(doc(db, 'products', id));
+          setConfirmConfig(prev => ({ ...prev, isOpen: false, isLoading: false }));
+          
+          setSuccessConfig({
+            isOpen: true,
+            title: 'Berhasil Dihapus',
+            message: 'Produk telah berhasil dihapus dari database.'
+          });
+          
+          fetchData();
+        } catch (error) {
+          handleFirestoreError(error, OperationType.DELETE, `products/${id}`);
+          setConfirmConfig(prev => ({ ...prev, isOpen: false, isLoading: false }));
+        }
+      }
+    });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleApplySubmit = async () => {
     try {
-      setLoading(true);
+      setConfirmConfig(prev => ({ ...prev, isLoading: true }));
       const data = {
         ...formData,
         price: Number(formData.price),
@@ -180,14 +235,35 @@ export default function AdminProducts() {
       // Update Links
       await setDoc(doc(db, 'products', productId, 'links', 'main'), editingLinks);
 
-      toast.success(editingProduct ? 'Produk diperbarui' : 'Produk ditambahkan');
+      setConfirmConfig(prev => ({ ...prev, isOpen: false, isLoading: false }));
       setModalOpen(false);
+      
+      setSuccessConfig({
+        isOpen: true,
+        title: editingProduct ? 'Berhasil Diupdate' : 'Berhasil Ditambahkan',
+        message: editingProduct 
+          ? 'Data produk telah berhasil diperbarui.' 
+          : 'Produk baru telah berhasil ditambahkan ke database.'
+      });
+
       fetchData();
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'products');
-    } finally {
-      setLoading(false);
+      setConfirmConfig(prev => ({ ...prev, isOpen: false, isLoading: false }));
     }
+  };
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    setConfirmConfig({
+      isOpen: true,
+      title: editingProduct ? 'Simpan Perubahan?' : 'Tambah Produk?',
+      message: editingProduct 
+        ? 'Apakah Anda ingin menyimpan perubahan pada produk ini?' 
+        : 'Pastikan data produk sudah benar sebelum disimpan.',
+      type: 'info',
+      onConfirm: handleApplySubmit
+    });
   };
 
   return (
@@ -317,8 +393,8 @@ export default function AdminProducts() {
                         <input
                           required
                           type="text"
-                          value={formData.name}
-                          onChange={e => setFormData({ ...formData, name: e.target.value })}
+                          value={formData.name || ''}
+                          onChange={e => setFormData({ ...formData, name: e.target.value || '' })}
                           className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-accent outline-none transition-all"
                           placeholder="Contoh: iPhone 15 Pro Max"
                         />
@@ -329,7 +405,7 @@ export default function AdminProducts() {
                           <label className="block text-sm font-medium text-gray-400 mb-1">Kategori</label>
                           <select
                             required
-                            value={formData.categoryId}
+                            value={formData.categoryId || ''}
                             onChange={e => setFormData({ ...formData, categoryId: e.target.value })}
                             className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-accent outline-none transition-all"
                           >
@@ -343,7 +419,7 @@ export default function AdminProducts() {
                         <div>
                           <label className="block text-sm font-medium text-gray-400 mb-1">Status</label>
                           <select
-                            value={formData.status}
+                            value={formData.status || 'active'}
                             onChange={e => setFormData({ ...formData, status: e.target.value as any })}
                             className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-accent outline-none transition-all"
                           >
@@ -353,31 +429,35 @@ export default function AdminProducts() {
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Harga (Rupiah)</label>
-                        <div className="relative">
-                          <input
-                            required
-                            type="text"
-                            inputMode="numeric"
-                            value={formData.price ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(formData.price) : ''}
-                            onChange={e => {
-                              const value = e.target.value.replace(/\D/g, '');
-                              setFormData({ ...formData, price: value ? parseInt(value) : 0 });
-                            }}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-accent outline-none transition-all font-mono"
-                            placeholder="Rp 0"
-                          />
+                        <div>
+                          <label className="block text-sm font-medium text-gray-400 mb-1">Harga (Rupiah)</label>
+                          <div className="relative">
+                            <input
+                              required
+                              type="text"
+                              inputMode="numeric"
+                              value={formData.price !== undefined && formData.price !== null ? (
+                                typeof formData.price === 'number' 
+                                  ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(formData.price) 
+                                  : formData.price
+                              ) : ''}
+                              onChange={e => {
+                                const val = e.target.value.replace(/\D/g, '');
+                                setFormData({ ...formData, price: val ? parseInt(val, 10) : '' });
+                              }}
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-accent outline-none transition-all font-mono"
+                              placeholder="Rp 0"
+                            />
+                          </div>
                         </div>
-                      </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">Deskripsi</label>
                         <textarea
                           required
                           rows={4}
-                          value={formData.description}
-                          onChange={e => setFormData({ ...formData, description: e.target.value })}
+                          value={formData.description || ''}
+                          onChange={e => setFormData({ ...formData, description: e.target.value || '' })}
                           className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-accent outline-none transition-all resize-none"
                           placeholder="Spesifikasi lengkap..."
                         />
@@ -389,40 +469,45 @@ export default function AdminProducts() {
                   <div className="space-y-8">
                     <div className="space-y-6">
                       <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 flex items-center">
-                        <ImageIcon className="w-4 h-4 mr-2" /> Media
+                        <ImageIcon className="w-4 h-4 mr-2" /> Media Produk
                       </h3>
 
-                      <div className="flex bg-white/5 p-1 rounded-xl mb-4">
-                        <button 
-                          type="button" 
-                          onClick={() => setImageTab('upload')}
-                          className={cn(
-                            "flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2",
-                            imageTab === 'upload' ? "bg-brand-accent text-white" : "text-gray-500 hover:text-white"
-                          )}
-                        >
-                          <Upload className="w-3.5 h-3.5" /> UPLOAD
-                        </button>
-                        <button 
-                          type="button" 
-                          onClick={() => setImageTab('url')}
-                          className={cn(
-                            "flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2",
-                            imageTab === 'url' ? "bg-brand-accent text-white" : "text-gray-500 hover:text-white"
-                          )}
-                        >
-                          <LinkIcon className="w-3.5 h-3.5" /> URL
-                        </button>
-                      </div>
-
-                      {imageTab === 'upload' ? (
+                      <div className="space-y-6">
+                        {/* URL Image Field */}
                         <div>
+                          <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-2">
+                            <LinkIcon className="w-3.5 h-3.5" /> URL Gambar (Optional)
+                          </label>
+                          <input
+                            type="url"
+                            value={(formData.imageUrl && !formData.imageUrl.startsWith('data:')) ? formData.imageUrl : ''}
+                            onChange={e => setFormData({ ...formData, imageUrl: e.target.value || '' })}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-accent outline-none transition-all"
+                            placeholder="https://example.com/image.jpg"
+                          />
+                        </div>
+
+                        {/* Local Upload Field */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-2">
+                            <Upload className="w-3.5 h-3.5" /> Upload Local (Optional)
+                          </label>
                           <div 
                             onClick={() => fileInputRef.current?.click()}
-                            className="w-full aspect-video bg-white/5 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-brand-accent/50 hover:bg-white/10 transition-all overflow-hidden"
+                            className={cn(
+                              "w-full aspect-video bg-white/5 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-brand-accent/50 hover:bg-white/10 transition-all overflow-hidden relative",
+                              formData.imageUrl && "border-brand-accent/30"
+                            )}
                           >
-                            {formData.imageUrl && formData.imageUrl.startsWith('data:') ? (
-                              <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                            {formData.imageUrl ? (
+                              <>
+                                <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-contain" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <span className="bg-brand-accent text-white px-4 py-2 rounded-lg text-xs font-bold uppercase">
+                                    Ganti Gambar
+                                  </span>
+                                </div>
+                              </>
                             ) : (
                               <>
                                 <Upload className="w-8 h-8 text-gray-600 mb-2" />
@@ -438,34 +523,23 @@ export default function AdminProducts() {
                             accept="image/*" 
                             className="hidden" 
                           />
-                          {formData.imageUrl && formData.imageUrl.startsWith('data:') && (
+                          {formData.imageUrl && (
                              <button 
                                type="button" 
                                onClick={() => setFormData({...formData, imageUrl: ''})}
-                               className="text-[10px] uppercase font-bold text-red-400 mt-2 hover:underline"
+                               className="text-[10px] uppercase font-bold text-red-400 mt-2 hover:underline flex items-center gap-1"
                              >
-                               Hapus Gambar
+                               <X className="w-3 h-3" /> Hapus / Bersihkan Gambar
                              </button>
                           )}
                         </div>
-                      ) : (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-400 mb-1">URL Gambar</label>
-                          <input
-                            required
-                            type="url"
-                            value={formData.imageUrl.startsWith('data:') ? '' : formData.imageUrl}
-                            onChange={e => setFormData({ ...formData, imageUrl: e.target.value })}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-accent outline-none transition-all"
-                            placeholder="https://..."
-                          />
-                          {formData.imageUrl && !formData.imageUrl.startsWith('data:') && (
-                            <div className="mt-4 aspect-video rounded-xl overflow-hidden bg-white/5 border border-white/10">
-                              <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-contain" />
-                            </div>
-                          )}
-                        </div>
-                      )}
+                        
+                        {formData.imageUrl && (
+                          <p className="text-[10px] text-brand-accent italic">
+                            * Produk akan menggunakan gambar yang tertera di atas.
+                          </p>
+                        )}
+                      </div>
                     </div>
 
                     <div className="space-y-6">
@@ -478,7 +552,7 @@ export default function AdminProducts() {
                           <input
                             type="url"
                             value={editingLinks.tokopedia || ''}
-                            onChange={e => setEditingLinks({ ...editingLinks, tokopedia: e.target.value })}
+                            onChange={e => setEditingLinks({ ...editingLinks, tokopedia: e.target.value || '' })}
                             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-[#42b549] outline-none transition-all text-sm"
                             placeholder="https://tokopedia.com/..."
                           />
@@ -488,7 +562,7 @@ export default function AdminProducts() {
                           <input
                             type="url"
                             value={editingLinks.shopee || ''}
-                            onChange={e => setEditingLinks({ ...editingLinks, shopee: e.target.value })}
+                            onChange={e => setEditingLinks({ ...editingLinks, shopee: e.target.value || '' })}
                             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-[#ee4d2d] outline-none transition-all text-sm"
                             placeholder="https://shopee.co.id/..."
                           />
@@ -498,7 +572,7 @@ export default function AdminProducts() {
                           <input
                             type="url"
                             value={editingLinks.blibli || ''}
-                            onChange={e => setEditingLinks({ ...editingLinks, blibli: e.target.value })}
+                            onChange={e => setEditingLinks({ ...editingLinks, blibli: e.target.value || '' })}
                             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-[#0095da] outline-none transition-all text-sm"
                             placeholder="https://blibli.com/..."
                           />
@@ -530,6 +604,26 @@ export default function AdminProducts() {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+        isLoading={confirmConfig.isLoading}
+      />
+
+      <ConfirmDialog
+        isOpen={successConfig.isOpen}
+        onClose={() => setSuccessConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={() => setSuccessConfig(prev => ({ ...prev, isOpen: false }))}
+        title={successConfig.title}
+        message={successConfig.message}
+        type="success"
+        confirmLabel="Siap!"
+      />
     </div>
   );
 }

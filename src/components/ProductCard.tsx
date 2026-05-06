@@ -28,10 +28,10 @@ export const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
 
       {/* Content */}
       <div className="p-5 text-center flex flex-col items-center">
-        <h3 className="text-lg font-semibold text-white mb-2 line-clamp-1 group-hover:text-brand-accent transition-colors">
+        <h3 className="text-lg font-semibold text-white mb-2 line-clamp-1 group-hover:text-brand-accent transition-colors break-words w-full">
           {product.name}
         </h3>
-        <p className="text-sm text-gray-400 mb-4 line-clamp-2 h-10 mx-auto max-w-[200px]">
+        <p className="text-sm text-gray-400 mb-4 line-clamp-2 h-10 mx-auto max-w-full break-words">
           {product.description}
         </p>
         <p className="text-xl font-bold text-brand-accent mb-6">

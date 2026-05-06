@@ -18,13 +18,15 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.uid == 'ES5QVs4PupZ2oo5QpDeY46txEEC3' ||
-        (request.auth.token.keys().contains('email') && request.auth.token.email.lower() == 'adminstar1@lifeisstar.com') ||
-        (request.auth.token.keys().contains('email') && request.auth.token.email.lower() == 'gilesptw4321@gmail.com')
+        request.auth.token.email.lower() == 'gilesptw4321@gmail.com' ||
+        request.auth.token.email.lower() == 'adminstar1@lifeisstar.com' ||
+        (request.auth.token.keys().contains('email') && exists(/databases/$(database)/documents/admins/$(request.auth.token.email.lower()))) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
 
     function isValidId(id) {
-      return id is string && id.size() < 256;
+      return id is string && id.size() > 0 && id.size() < 256;
     }
 
     function incoming() {
@@ -38,7 +40,7 @@ service cloud.firestore {
     // --- Validations ---
     function isValidCategory(data) {
       return data.keys().hasAll(['name']) &&
-             data.name is string;
+             data.name is string && data.name.size() > 0;
     }
 
     function isValidProduct(data) {
@@ -48,7 +50,10 @@ service cloud.firestore {
              data.name is string &&
              data.price is number &&
              data.description is string &&
-             data.imageUrl is string;
+             data.imageUrl is string &&
+             (!data.keys().contains('status') || data.status in ['active', 'hidden', 'Hidden', 'Active']) &&
+             (!data.keys().contains('createdAt') || data.createdAt is timestamp || data.createdAt == null) &&
+             (!data.keys().contains('updatedAt') || data.updatedAt is timestamp || data.updatedAt == null);
     }
 
     function isValidLinks(data) {
@@ -67,6 +72,19 @@ service cloud.firestore {
              data.name is string &&
              data.content is string &&
              data.rating is number && data.rating >= 1 && data.rating <= 5;
+    }
+
+    function isValidSettings(data) {
+      return (!data.keys().contains('mainTitle') || data.mainTitle is string) &&
+             (!data.keys().contains('vision') || data.vision is string) &&
+             (!data.keys().contains('mission') || data.mission is string) &&
+             (!data.keys().contains('ownerName') || data.ownerName is string) &&
+             (!data.keys().contains('ownerQuote') || data.ownerQuote is string) &&
+             (!data.keys().contains('ownerMessage') || data.ownerMessage is string) &&
+             (!data.keys().contains('ownerPhoto') || data.ownerPhoto is string) &&
+             (!data.keys().contains('address') || data.address is string) &&
+             (!data.keys().contains('phone') || data.phone is string) &&
+             (!data.keys().contains('updatedAt') || data.updatedAt is timestamp);
     }
 
     // --- Rules ---
@@ -102,6 +120,11 @@ service cloud.firestore {
     match /testimonials/{testimonialId} {
       allow read: if true;
       allow write: if isAdmin() && isValidId(testimonialId) && isValidTestimonial(incoming());
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidSettings(incoming());
     }
   }
 }

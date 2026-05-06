@@ -45,9 +45,30 @@
         "order": { "type": "number" }
       },
       "required": ["title", "content"]
+    },
+    "Settings": {
+      "title": "General Settings",
+      "description": "App-wide configuration settings",
+      "type": "object",
+      "properties": {
+        "mainTitle": { "type": "string", "description": "The main title for the About section" },
+        "vision": { "type": "string" },
+        "mission": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "ownerQuote": { "type": "string" },
+        "ownerMessage": { "type": "string" },
+        "ownerPhoto": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "firestore": {
+    "settings": {
+      "schema": "Settings",
+      "description": "App-wide settings documents"
+    },
     "categories": {
       "schema": "Category",
       "description": "List of product categories"

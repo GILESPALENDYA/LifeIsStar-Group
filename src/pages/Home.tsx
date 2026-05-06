@@ -13,6 +13,7 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [profile, setProfile] = useState<ProfileSection[]>([]);
+  const [profileTitle, setProfileTitle] = useState('Kenapa Memilih LIFEISSTAR?');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [loading, setLoading] = useState(true);
 
@@ -34,6 +35,17 @@ export default function Home() {
         // Fetch Profile
         const profSnap = await getDocs(query(collection(db, 'profile'), orderBy('order')));
         setProfile(profSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProfileSection)));
+
+        // Fetch Profile Title
+        try {
+          const sSnap = await getDocs(collection(db, 'settings'));
+          const profSettings = sSnap.docs.find(d => d.id === 'profile');
+          if (profSettings) {
+            setProfileTitle(profSettings.data().mainTitle || 'Kenapa Memilih LIFEISSTAR?');
+          }
+        } catch (e) {
+          console.error("Error fetching title:", e);
+        }
 
         // Fetch Products
         await fetchProducts('all');
@@ -163,56 +175,31 @@ export default function Home() {
       <Testimonials />
 
       {/* About Section */}
-      <section id="about" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 border-t border-white/5">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <span className="text-brand-accent font-semibold tracking-wider uppercase text-sm mb-4 block">Our Identity</span>
-            <h2 className="text-4xl font-display font-bold mb-8">Kenapa Memilih LIFEISSTAR?</h2>
-            
-            <div className="space-y-8">
-              {profile.map((item) => (
-                <div key={item.id} className="group">
-                  <h3 className="text-xl font-semibold mb-2 group-hover:text-brand-accent transition-colors">{item.title}</h3>
-                  <p className="text-gray-400 leading-relaxed">{item.content}</p>
-                </div>
-              ))}
-              
-              {profile.length === 0 && (
-                <>
-                  <div className="group">
-                    <h3 className="text-xl font-semibold mb-2 group-hover:text-brand-accent transition-colors">Produk Original</h3>
-                    <p className="text-gray-400 leading-relaxed">Kami menjamin semua produk yang kami jual 100% original dan bergaransi resmi.</p>
-                  </div>
-                  <div className="group">
-                    <h3 className="text-xl font-semibold mb-2 group-hover:text-brand-accent transition-colors">Harga Bersaing</h3>
-                    <p className="text-gray-400 leading-relaxed">Dapatkan penawaran terbaik di pasar tanpa mengorbankan kualitas layanan.</p>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+      <section id="about" className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20 border-t border-white/5">
+        <div className="text-center">
+          <span className="text-brand-accent font-semibold tracking-wider uppercase text-sm mb-4 block">Our Identity</span>
+          <h2 className="text-4xl font-display font-bold mb-12">{profileTitle}</h2>
           
-          <div className="relative">
-             <div className="aspect-[4/5] rounded-3xl overflow-hidden shadow-2xl">
-               <img 
-                 src="https://images.unsplash.com/photo-1556656793-062ff9878273?q=80&w=1470&auto=format&fit=crop" 
-                 alt="Store Showroom" 
-                 className="w-full h-full object-cover"
-                 referrerPolicy="no-referrer"
-               />
-               <div className="absolute inset-0 bg-gradient-to-t from-brand-bg via-transparent to-transparent" />
-             </div>
-             
-             {/* Stats Overlay */}
-             <div className="absolute -bottom-10 -right-10 bg-brand-accent p-8 rounded-2xl shadow-xl hidden md:block">
-               <div className="text-4xl font-bold mb-1">5.0</div>
-               <div className="text-sm font-medium opacity-80 uppercase tracking-wider">Average Rating</div>
-               <div className="mt-4 flex space-x-1">
-                 {[...Array(5)].map((_, i) => (
-                   <div key={i} className="w-4 h-4 bg-brand-gold rounded-full" />
-                 ))}
-               </div>
-             </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-left">
+            {profile.map((item) => (
+              <div key={item.id} className="group p-6 bg-white/5 border border-white/10 rounded-2xl hover:border-brand-accent/50 transition-all overflow-hidden break-words">
+                <h3 className="text-xl font-semibold mb-3 group-hover:text-brand-accent transition-colors break-words">{item.title}</h3>
+                <p className="text-gray-400 leading-relaxed text-sm break-words">{item.content}</p>
+              </div>
+            ))}
+            
+            {profile.length === 0 && (
+              <>
+                <div className="group p-6 bg-white/5 border border-white/10 rounded-2xl hover:border-brand-accent/50 transition-all overflow-hidden break-words">
+                  <h3 className="text-xl font-semibold mb-3 group-hover:text-brand-accent transition-colors break-words">Produk Original</h3>
+                  <p className="text-gray-400 leading-relaxed text-sm break-words">Kami menjamin semua produk yang kami jual 100% original dan bergaransi resmi.</p>
+                </div>
+                <div className="group p-6 bg-white/5 border border-white/10 rounded-2xl hover:border-brand-accent/50 transition-all overflow-hidden break-words">
+                  <h3 className="text-xl font-semibold mb-3 group-hover:text-brand-accent transition-colors break-words">Harga Bersaing</h3>
+                  <p className="text-gray-400 leading-relaxed text-sm break-words">Dapatkan penawaran terbaik di pasar tanpa mengorbankan kualitas layanan.</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </section>

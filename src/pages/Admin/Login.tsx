@@ -35,17 +35,31 @@ export default function AdminLogin() {
         finalEmail = `${finalEmail}@lifeisstar.com`;
       }
       finalEmail = finalEmail.toLowerCase();
+      
+      console.log('Attempting login for:', finalEmail);
+      
       await signInWithEmailAndPassword(auth, finalEmail, password);
       toast.success('Login berhasil');
       navigate('/admin/dashboard');
     } catch (error: any) {
-      console.error(error);
+      console.error('Login Error:', error);
       let message = 'Gagal login: Periksa kredensial Anda';
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        message = 'Email atau password salah. Pastikan akun sudah didaftarkan di Firebase Console.';
+      
+      // Modern Firebase Auth uses 'auth/invalid-credential' for most failures
+      if (
+        error.code === 'auth/user-not-found' || 
+        error.code === 'auth/wrong-password' || 
+        error.code === 'auth/invalid-credential' ||
+        error.code === 'auth/invalid-email'
+      ) {
+        message = 'Email atau password salah. Pastikan Anda menggunakan akun yang terdaftar.';
+        console.warn('Authentication failed: Invalid credentials provided.');
       } else if (error.code === 'auth/operation-not-allowed') {
-        message = 'Metode Sign-in Email/Password belum diaktifkan. Silakan aktifkan di Firebase Console > Authentication > Sign-in Method.';
+        message = 'Metode Sign-in Email/Password belum diaktifkan di Firebase Console.';
+      } else if (error.code === 'auth/too-many-requests') {
+        message = 'Terlalu banyak percobaan login. Silakan coba lagi nanti.';
       }
+      
       toast.error(message);
     } finally {
       setLoading(false);
