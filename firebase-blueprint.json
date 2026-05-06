@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "Category": {
+      "title": "Category",
+      "description": "Product categories like iPhone, Laptop, Tablet",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The name of the category" }
+      },
+      "required": ["name"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Core product data",
+      "type": "object",
+      "properties": {
+        "categoryId": { "type": "string", "description": "Reference to Category ID" },
+        "name": { "type": "string", "description": "Product name" },
+        "price": { "type": "number", "description": "Price in Rupiah" },
+        "description": { "type": "string", "description": "Product description" },
+        "imageUrl": { "type": "string", "description": "URL to the product image" },
+        "status": { "type": "string", "enum": ["active", "hidden"], "description": "Visibility status" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["categoryId", "name", "price", "description", "imageUrl"]
+    },
+    "MarketplaceLinks": {
+      "title": "MarketplaceLinks",
+      "description": "Redirect links to marketplaces",
+      "type": "object",
+      "properties": {
+        "tokopedia": { "type": "string" },
+        "shopee": { "type": "string" },
+        "blibli": { "type": "string" }
+      }
+    },
+    "ProfileSection": {
+      "title": "ProfileSection",
+      "description": "Company profile sections",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["title", "content"]
+    }
+  },
+  "firestore": {
+    "categories": {
+      "schema": "Category",
+      "description": "List of product categories"
+    },
+    "products": {
+      "schema": "Product",
+      "description": "List of electronics products"
+    },
+    "products/{productId}/links": {
+      "schema": "MarketplaceLinks",
+      "description": "Marketplace links for a specific product (single document named 'main')"
+    },
+    "profile": {
+      "schema": "ProfileSection",
+      "description": "Company profile sections"
+    }
+  }
+}
