@@ -84,7 +84,8 @@ export default function AdminProducts() {
     price: 0 as number | string,
     description: '',
     imageUrl: '',
-    status: 'active' as 'active' | 'hidden'
+    status: 'active' as 'active' | 'hidden',
+    stock: 0
   });
 
   useEffect(() => {
@@ -127,7 +128,8 @@ export default function AdminProducts() {
       price: product.price ?? 0,
       description: product.description || '',
       imageUrl: product.imageUrl || '',
-      status: product.status || 'active'
+      status: product.status || 'active',
+      stock: product.stock ?? 0
     });
 
     // Fetch links
@@ -174,7 +176,8 @@ export default function AdminProducts() {
       price: 0,
       description: '',
       imageUrl: '',
-      status: 'active'
+      status: 'active',
+      stock: 0
     });
     setEditingLinks({
       tokopedia: '',
@@ -299,6 +302,7 @@ export default function AdminProducts() {
                 <th className="px-6 py-4">Produk</th>
                 <th className="px-6 py-4">Kategori</th>
                 <th className="px-6 py-4">Harga</th>
+                <th className="px-6 py-4">Stock</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Aksi</th>
               </tr>
@@ -319,6 +323,14 @@ export default function AdminProducts() {
                   </td>
                   <td className="px-6 py-4 font-medium text-brand-accent">
                     {formatCurrency(p.price)}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={cn(
+                      "font-mono text-sm",
+                      p.stock === 0 ? "text-red-400" : "text-gray-300"
+                    )}>
+                      {p.stock}
+                    </span>
                   </td>
                   <td className="px-6 py-4">
                     <span className={cn(
@@ -429,6 +441,7 @@ export default function AdminProducts() {
                         </div>
                       </div>
 
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-400 mb-1">Harga (Rupiah)</label>
                           <div className="relative">
@@ -450,6 +463,19 @@ export default function AdminProducts() {
                             />
                           </div>
                         </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-400 mb-1">Stock</label>
+                          <input
+                            required
+                            type="number"
+                            min="0"
+                            value={formData.stock}
+                            onChange={e => setFormData({ ...formData, stock: parseInt(e.target.value || '0', 10) })}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-accent outline-none transition-all font-mono"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">Deskripsi</label>

@@ -12,16 +12,26 @@ import {
   ExternalLink,
   ChevronRight,
   LayoutDashboard,
-  MessageSquare
+  MessageSquare,
+  Eye
 } from 'lucide-react';
+import { 
+  PieChart, 
+  Pie, 
+  Tooltip, 
+  ResponsiveContainer,
+  Cell,
+  Legend
+} from 'recharts';
 import { auth, db } from '../../lib/firebase';
 import { cn } from '../../lib/utils';
-import { collection, getDocs, query, limit } from 'firebase/firestore';
+import { collection, getDocs, query, limit, orderBy } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 export default function AdminDashboard() {
   const [user, setUser] = useState<any>(null);
-  const [stats, setStats] = useState({ products: 0, categories: 0 });
+  const [stats, setStats] = useState({ products: 0, categories: 0, totalViews: 0 });
+  const [topProducts, setTopProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -41,9 +51,29 @@ export default function AdminDashboard() {
     try {
       const pSnap = await getDocs(collection(db, 'products'));
       const cSnap = await getDocs(collection(db, 'categories'));
+      
+      let totalViews = 0;
+      const productsData: any[] = [];
+      pSnap.forEach(doc => {
+        const data = doc.data();
+        const views = data.views || 0;
+        totalViews += views;
+        productsData.push({
+          name: data.name.length > 15 ? data.name.substring(0, 15) + '...' : data.name,
+          views: views
+        });
+      });
+
+      // Sort by views and take top 4
+      const top4 = productsData
+        .sort((a, b) => b.views - a.views)
+        .slice(0, 4);
+
+      setTopProducts(top4);
       setStats({
         products: pSnap.size,
-        categories: cSnap.size
+        categories: cSnap.size,
+        totalViews
       });
     } catch (error) {
       console.error(error);
@@ -61,6 +91,8 @@ export default function AdminDashboard() {
       toast.error('Gagal logout');
     }
   };
+
+  const PIE_COLORS = ['#4F8AFA', '#D1239F', '#79B93B', '#FCB040'];
 
   if (loading) return null;
 
@@ -107,6 +139,65 @@ export default function AdminDashboard() {
           </div>
           <div className="text-2xl font-bold">{stats.categories}</div>
           <div className="text-sm text-gray-400">Kategori Aktif</div>
+        </div>
+
+        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-2 bg-blue-400/10 rounded-lg">
+              <Eye className="w-5 h-5 text-blue-400" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold">{stats.totalViews}</div>
+          <div className="text-sm text-gray-400">Total Kunjungan Produk</div>
+        </div>
+      </div>
+
+      {/* Analytics Chart */}
+      <div className="bg-white/5 border border-white/10 p-8 rounded-3xl mb-12 backdrop-blur-sm shadow-xl">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-xl font-display font-bold">Produk Terpopuler</h2>
+            <p className="text-sm text-gray-400 mt-1">Berdasarkan jumlah kunjungan halaman detail</p>
+          </div>
+          <BarChart3 className="w-6 h-6 text-brand-accent opacity-50" />
+        </div>
+        
+        <div className="h-[400px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={topProducts}
+                cx="50%"
+                cy="50%"
+                innerRadius={80}
+                outerRadius={120}
+                paddingAngle={8}
+                dataKey="views"
+                stroke="none"
+              >
+                {topProducts.map((_, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={PIE_COLORS[index % PIE_COLORS.length]} 
+                  />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{ 
+                  backgroundColor: '#0A0A0A', 
+                  borderColor: '#ffffff10',
+                  borderRadius: '12px',
+                  color: '#fff'
+                }}
+                itemStyle={{ color: '#fff' }}
+              />
+              <Legend 
+                verticalAlign="bottom" 
+                height={36}
+                formatter={(value) => <span className="text-gray-400 text-sm font-medium">{value}</span>}
+              />
+            </PieChart>
+          </ResponsiveContainer>
         </div>
       </div>
 

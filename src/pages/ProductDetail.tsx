@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
 import { motion } from 'motion/react';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { Product, MarketplaceLinks } from '../types';
@@ -13,6 +13,7 @@ export default function ProductDetail() {
   const [product, setProduct] = useState<Product | null>(null);
   const [links, setLinks] = useState<MarketplaceLinks | null>(null);
   const [loading, setLoading] = useState(true);
+  const lastCountedId = useRef<string | null>(null);
 
   useEffect(() => {
     async function fetchProduct() {
@@ -23,6 +24,14 @@ export default function ProductDetail() {
         if (pSnap.exists()) {
           setProduct({ id: pSnap.id, ...pSnap.data() } as Product);
           
+          // Increment views only once per product visit
+          if (lastCountedId.current !== id) {
+            lastCountedId.current = id;
+            updateDoc(doc(db, 'products', id), {
+              views: increment(1)
+            }).catch(err => console.error("Error incrementing views:", err));
+          }
+
           const lSnap = await getDoc(doc(db, 'products', id, 'links', 'main'));
           if (lSnap.exists()) {
             setLinks(lSnap.data() as MarketplaceLinks);
@@ -83,7 +92,17 @@ export default function ProductDetail() {
           className="flex flex-col"
         >
           <h1 className="text-4xl md:text-5xl font-display font-bold mb-4">{product.name}</h1>
-          <p className="text-3xl font-bold text-brand-accent mb-8">{formatCurrency(product.price)}</p>
+          <p className="text-3xl font-bold text-brand-accent mb-2">{formatCurrency(product.price)}</p>
+          <div className="flex items-center gap-2 mb-8">
+            <span className={cn(
+              "text-xs font-bold uppercase px-2 py-1 rounded-md border",
+              product.stock > 0 
+                ? "bg-green-400/10 border-green-400/20 text-green-400" 
+                : "bg-red-400/10 border-red-400/20 text-red-400"
+            )}>
+              {product.stock > 0 ? `Stock: ${product.stock}` : 'Stock Habis'}
+            </span>
+          </div>
           
           <div className="prose prose-invert max-w-none mb-10">
             <h3 className="text-lg font-semibold text-white mb-3 font-display">Deskripsi Produk</h3>
@@ -114,44 +133,51 @@ export default function ProductDetail() {
           {/* Checkout Options */}
           <div className="mt-auto">
             <h3 className="text-lg font-semibold mb-4 font-display">Beli di Marketplace</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {links?.tokopedia && (
-                <a
-                  href={links.tokopedia}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center px-4 py-3 bg-[#42b549] text-white rounded-xl hover:opacity-90 transition-all font-medium"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Tokopedia
-                </a>
-              )}
-              {links?.shopee && (
-                <a
-                  href={links.shopee}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center px-4 py-3 bg-[#ee4d2d] text-white rounded-xl hover:opacity-90 transition-all font-medium"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Shopee
-                </a>
-              )}
-              {links?.blibli && (
-                <a
-                  href={links.blibli}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center px-4 py-3 bg-[#0095da] text-white rounded-xl hover:opacity-90 transition-all font-medium"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  BliBli
-                </a>
-              )}
-              {!links?.tokopedia && !links?.shopee && !links?.blibli && (
-                <p className="text-gray-500 italic text-sm col-span-full">Link belum tersedia. Silakan hubungi admin.</p>
-              )}
-            </div>
+            {product.stock > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {links?.tokopedia && (
+                  <a
+                    href={links.tokopedia}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center px-4 py-3 bg-[#42b549] text-white rounded-xl hover:opacity-90 transition-all font-medium"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Tokopedia
+                  </a>
+                )}
+                {links?.shopee && (
+                  <a
+                    href={links.shopee}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center px-4 py-3 bg-[#ee4d2d] text-white rounded-xl hover:opacity-90 transition-all font-medium"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Shopee
+                  </a>
+                )}
+                {links?.blibli && (
+                  <a
+                    href={links.blibli}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center px-4 py-3 bg-[#0095da] text-white rounded-xl hover:opacity-90 transition-all font-medium"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    BliBli
+                  </a>
+                )}
+                {!links?.tokopedia && !links?.shopee && !links?.blibli && (
+                  <p className="text-gray-500 italic text-sm col-span-full">Link belum tersedia. Silakan hubungi admin.</p>
+                )}
+              </div>
+            ) : (
+              <div className="p-4 bg-red-400/10 border border-red-400/20 rounded-xl text-center">
+                <p className="text-red-400 font-bold uppercase tracking-widest text-sm">Maaf, Stok Sedang Kosong</p>
+                <p className="text-gray-500 text-xs mt-1 italic">Silakan hubungi admin untuk informasi restock</p>
+              </div>
+            )}
           </div>
         </motion.div>
       </div>

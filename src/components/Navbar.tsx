@@ -1,8 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
-import { ShoppingBag, Menu, X, ShieldCheck } from 'lucide-react';
+import { Menu, X, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import Logo from './Logo';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -21,7 +22,7 @@ export default function Navbar() {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-2">
-              <ShoppingBag className="w-8 h-8 text-brand-accent" />
+              <Logo className="w-10 h-10" />
               <span className="text-xl font-display font-bold tracking-tight">LIFEISSTAR</span>
             </Link>
           </div>

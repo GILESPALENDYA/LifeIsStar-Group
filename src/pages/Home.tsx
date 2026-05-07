@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { motion } from 'motion/react';
@@ -104,12 +105,12 @@ export default function Home() {
               >
                 Mulai Belanja
               </a>
-              <a 
-                href="#about"
+              <Link 
+                to="/about"
                 className="w-full sm:w-auto px-10 py-4 bg-white/5 text-white font-semibold rounded-full border border-white/10 hover:bg-white/10 transition-all active:scale-95 text-center"
               >
                 Tentang Kami
-              </a>
+              </Link>
             </div>
           </motion.div>
         </div>

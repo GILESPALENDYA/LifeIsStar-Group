@@ -21,9 +21,11 @@
         "imageUrl": { "type": "string", "description": "URL to the product image" },
         "status": { "type": "string", "enum": ["active", "hidden"], "description": "Visibility status" },
         "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "views": { "type": "number", "description": "Number of times the product has been viewed" },
+        "stock": { "type": "number", "minimum": 0, "description": "Current stock level" }
       },
-      "required": ["categoryId", "name", "price", "description", "imageUrl"]
+      "required": ["categoryId", "name", "price", "description", "imageUrl", "stock"]
     },
     "MarketplaceLinks": {
       "title": "MarketplaceLinks",

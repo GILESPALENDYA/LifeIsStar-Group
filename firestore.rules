@@ -26,7 +26,7 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() < 256;
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     function incoming() {
@@ -40,18 +40,20 @@ service cloud.firestore {
     // --- Validations ---
     function isValidCategory(data) {
       return data.keys().hasAll(['name']) &&
-             data.name is string && data.name.size() > 0;
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100;
     }
 
     function isValidProduct(data) {
       // Basic keys required
-      return data.keys().hasAll(['categoryId', 'name', 'price', 'description', 'imageUrl']) &&
-             data.categoryId is string &&
-             data.name is string &&
-             data.price is number &&
-             data.description is string &&
-             data.imageUrl is string &&
+      return data.keys().hasAll(['categoryId', 'name', 'price', 'description', 'imageUrl', 'stock']) &&
+             data.categoryId is string && data.categoryId.size() <= 128 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.price is number && data.price >= 0 &&
+             data.description is string && data.description.size() <= 5000 &&
+             data.imageUrl is string && data.imageUrl.size() <= 1000 &&
+             data.stock is number && data.stock >= 0 &&
              (!data.keys().contains('status') || data.status in ['active', 'hidden', 'Hidden', 'Active']) &&
+             (!data.keys().contains('views') || data.views is number) &&
              (!data.keys().contains('createdAt') || data.createdAt is timestamp || data.createdAt == null) &&
              (!data.keys().contains('updatedAt') || data.updatedAt is timestamp || data.updatedAt == null);
     }
@@ -96,14 +98,17 @@ service cloud.firestore {
 
     match /categories/{categoryId} {
       allow read: if true;
-      allow write: if isAdmin() && isValidCategory(incoming());
+      allow create, update: if isAdmin() && isValidCategory(incoming());
+      allow delete: if isAdmin();
     }
 
     match /products/{productId} {
       allow list: if isAdmin() || resource.data.status == 'active';
       allow get: if true;
       allow create: if isAdmin() && isValidId(productId) && isValidProduct(incoming());
-      allow update: if isAdmin() && isValidProduct(incoming());
+      allow update: if (isAdmin() && isValidProduct(incoming())) || 
+                    (incoming().diff(existing()).affectedKeys().hasOnly(['views']) && 
+                     (incoming().views == existing().get('views', 0) + 1));
       allow delete: if isAdmin();
 
       match /links/main {
@@ -114,17 +119,20 @@ service cloud.firestore {
 
     match /profile/{sectionId} {
       allow read: if true;
-      allow write: if isAdmin() && isValidProfile(incoming());
+      allow create, update: if isAdmin() && isValidProfile(incoming());
+      allow delete: if isAdmin();
     }
 
     match /testimonials/{testimonialId} {
       allow read: if true;
-      allow write: if isAdmin() && isValidId(testimonialId) && isValidTestimonial(incoming());
+      allow create, update: if isAdmin() && isValidId(testimonialId) && isValidTestimonial(incoming());
+      allow delete: if isAdmin();
     }
 
     match /settings/{docId} {
       allow read: if true;
-      allow write: if isAdmin() && isValidSettings(incoming());
+      allow create, update: if isAdmin() && isValidSettings(incoming());
+      allow delete: if isAdmin();
     }
   }
 }

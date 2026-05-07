@@ -13,6 +13,8 @@ export interface Product {
   status: 'active' | 'hidden';
   createdAt: any;
   updatedAt: any;
+  views?: number;
+  stock: number;
 }
 
 export interface MarketplaceLinks {

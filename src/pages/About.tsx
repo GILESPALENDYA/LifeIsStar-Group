@@ -14,8 +14,6 @@ import {
 } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
 
 interface AboutSettings {
   vision?: string;
@@ -58,9 +56,7 @@ export default function About() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-bg text-white font-sans selection:bg-brand-accent selection:text-white">
-      <Navbar />
-      
+    <>
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -206,8 +202,6 @@ export default function About() {
           </div>
         </div>
       </section>
-
-      <Footer />
-    </div>
+    </>
   );
 }
